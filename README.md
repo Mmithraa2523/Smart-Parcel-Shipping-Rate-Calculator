@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SwiftShip smart parcel shipping
 
 A complete quote-and-booking application for SwiftShip Logistics. It calculates itemized shipping rates, simulates card or corporate-account payments, and persists only approved bookings. There is no real payment provider.
@@ -221,3 +222,6 @@ For a requirement-by-requirement implementation and verification mapping, see [`
 ## Implementation boundary
 
 Authentication, carrier integrations, real payment processing, tracking, deployment automation, and production-grade observability are intentionally out of scope.
+=======
+# Smart-Parcel-Shipping-Rate-Calculator
+>>>>>>> origin/main
