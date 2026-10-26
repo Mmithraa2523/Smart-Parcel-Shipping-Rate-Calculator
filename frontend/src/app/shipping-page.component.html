@@ -1,0 +1,145 @@
+<header class="topbar">
+  <a class="brand" href="/" aria-label="SwiftShip home">
+    <span class="brand-mark" aria-hidden="true">S</span>
+    <span>swiftship</span>
+  </a>
+  <span class="topbar-note"><span aria-hidden="true">●</span> Dependable delivery, made simple</span>
+</header>
+
+<main class="page-shell">
+  <section class="intro" aria-labelledby="page-title">
+    <p class="eyebrow"><span></span> A clearer way to ship</p>
+    <h1 id="page-title">Your parcel,<br><span>right on schedule.</span></h1>
+    <p class="intro-copy">Tell us where it needs to go. We’ll find the right rate, with no surprises.</p>
+    <div class="trust-strip">
+      <span><span aria-hidden="true">✓</span> Upfront pricing</span>
+      <span><span aria-hidden="true">✓</span> Three delivery speeds</span>
+      <span><span aria-hidden="true">✓</span> Secure, simulated checkout</span>
+    </div>
+  </section>
+
+  <section class="calculator" aria-label="Parcel quote and booking calculator">
+    <div class="form-panel">
+      <div class="section-heading">
+        <div class="step-index">01</div>
+        <div><h2>Your shipment</h2><p>A few details to find your rate.</p></div>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="getQuote()" (input)="invalidateQuote()" (change)="invalidateQuote()">
+        <div class="field-row">
+          <label class="field">
+            <span>Parcel weight <span class="field-unit">kg</span></span>
+            <input type="number" min="0.1" max="50" step="0.1" formControlName="weightKg" aria-label="Parcel weight in kilograms">
+            @if (fieldError('weightKg'); as message) { <small class="field-error">{{ message }}</small> }
+          </label>
+          <label class="field">
+            <span>Delivery distance <span class="field-unit">km</span></span>
+            <input type="number" min="1" max="2500" step="1" formControlName="distanceKm" aria-label="Delivery distance in kilometers">
+            @if (fieldError('distanceKm'); as message) { <small class="field-error">{{ message }}</small> }
+          </label>
+        </div>
+
+        <fieldset class="tier-fieldset">
+          <legend>Choose a delivery speed</legend>
+          @if (isLoadingTiers()) {
+            <p class="loading-note">Loading delivery options…</p>
+          } @else {
+            <div class="tier-list">
+              @for (tier of tiers(); track tier.code) {
+                <label class="tier-option" [class.selected]="form.controls.tier.value === tier.code">
+                  <input type="radio" formControlName="tier" [value]="tier.code" [attr.aria-label]="tier.name">
+                  <span class="radio-indicator" aria-hidden="true"></span>
+                  <span class="tier-copy">
+                    <span class="tier-name">{{ tier.name }}</span>
+                    <span class="tier-estimate">{{ tier.deliveryEstimate }}</span>
+                    @if (tier.maximumDistanceKm) {
+                      <span class="tier-estimate">Up to {{ tier.maximumDistanceKm }} km</span>
+                    }
+                  </span>
+                  <span class="tier-rates">{{ tier.baseFee | currency }}/base</span>
+                </label>
+              } @empty {
+                <p class="loading-note">Delivery options are unavailable.</p>
+              }
+            </div>
+          }
+          @if (fieldError('tier'); as message) { <small class="field-error">{{ message }}</small> }
+        </fieldset>
+
+        <fieldset class="payment-fieldset">
+          <legend>Payment method</legend>
+          <label class="select-label">
+            <select formControlName="paymentMethod" aria-label="Payment method">
+              <option value="CREDIT_CARD">Credit Card</option>
+              <option value="CORPORATE_ACCOUNT_BILLING">Corporate Account Billing</option>
+            </select>
+            <span aria-hidden="true">⌄</span>
+          </label>
+          <label class="simulation-option">
+            <input type="checkbox" formControlName="simulatePaymentFailure">
+            <span>Simulate a declined payment</span>
+          </label>
+          <p class="payment-note">Payments are simulated. No real payment details or provider are used.</p>
+        </fieldset>
+
+        <button class="primary-button quote-button" type="submit" [disabled]="isQuoting() || isLoadingTiers() || tiers().length === 0">
+          {{ isQuoting() ? 'Finding your rate…' : 'Get my shipping rate' }}
+          @if (!isQuoting()) { <span aria-hidden="true">→</span> }
+        </button>
+      </form>
+    </div>
+
+    <aside class="summary-panel" aria-label="Quote and booking summary" aria-live="polite">
+      <div class="summary-topline">
+        <span class="eyebrow summary-eyebrow"><span></span> Your estimate</span>
+        <span class="estimate-label">IN USD</span>
+      </div>
+
+      @if (errorMessage(); as message) {
+        <div class="alert-error" role="alert">{{ message }}</div>
+      }
+
+      @if (booking(); as confirmed) {
+        <div class="confirmation" role="status">
+          <span class="confirmation-check" aria-hidden="true">✓</span>
+          <p class="eyebrow">You’re all set</p>
+          <h2>Booking confirmed.</h2>
+          <p>Your {{ confirmed.tier.replace('_', ' ') }} delivery is on its way.</p>
+          <div class="confirmation-detail"><span>Booking reference</span><strong>{{ confirmed.bookingId }}</strong></div>
+          <div class="confirmation-detail"><span>Payment reference</span><strong>{{ confirmed.paymentReference }}</strong></div>
+          <div class="confirmation-total"><span>Total paid</span><strong>{{ confirmed.total | currency }}</strong></div>
+          <button class="secondary-button" type="button" (click)="booking.set(null); quote.set(null)">Book another parcel</button>
+        </div>
+      } @else if (quote(); as estimate) {
+        <div class="quote-result">
+          <p class="result-delivery">{{ estimate.deliveryEstimate }} · {{ estimate.tier.replace('_', ' ') }}</p>
+          <p class="result-total">{{ estimate.total | currency }}</p>
+          <p class="result-caption">Your all-in shipping rate</p>
+          <div class="quote-breakdown">
+            <div><span>Base rate</span><span>{{ estimate.baseFee | currency }}</span></div>
+            <div><span>Weight</span><span>{{ estimate.weightCharge | currency }}</span></div>
+            <div><span>Distance</span><span>{{ estimate.distanceCharge | currency }}</span></div>
+          </div>
+          <button class="primary-button booking-button" type="button" (click)="createBooking()" [disabled]="isBooking()">
+            {{ isBooking() ? 'Confirming your booking…' : 'Confirm this booking' }}
+            @if (!isBooking()) { <span aria-hidden="true">→</span> }
+          </button>
+          <p class="secure-note">No real payment is collected. Your booking is saved after simulated approval.</p>
+        </div>
+      } @else {
+        <div class="empty-summary">
+          <span class="parcel-icon" aria-hidden="true">✳</span>
+          <h2>Your price,<br>at a glance.</h2>
+          <p>Select a delivery speed and enter your parcel details. Your price is calculated before you commit.</p>
+        </div>
+        <div class="summary-footer"><span class="footer-dot"></span> No hidden fees. No guesswork.</div>
+      }
+    </aside>
+  </section>
+
+  <footer class="page-footer">
+    <span>SWIFTSHIP LOGISTICS</span>
+    <span>Good things, delivered thoughtfully.</span>
+    <span>Shipping, simplified.</span>
+  </footer>
+</main>

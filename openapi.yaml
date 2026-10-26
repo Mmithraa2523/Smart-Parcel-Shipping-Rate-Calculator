@@ -1,0 +1,265 @@
+openapi: 3.1.0
+info:
+  title: SwiftShip Parcel Shipping API
+  version: 1.0.0
+  description: >
+    Quotes and bookings for simulated parcel shipping. All monetary amounts
+    are USD; payments are simulated, and no real payment provider is used.
+servers:
+  - url: http://localhost:8080/api
+    description: Local Apache CXF JAX-RS API
+tags:
+  - name: Tiers
+  - name: Quotes
+  - name: Bookings
+paths:
+  /tiers:
+    get:
+      tags: [Tiers]
+      summary: List available delivery tiers and their rate cards.
+      operationId: listShippingTiers
+      responses:
+        "200":
+          description: Registered shipping tiers, sorted by tier code.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tier"
+  /quotes:
+    post:
+      tags: [Quotes]
+      summary: Calculate an itemized, non-binding shipping quote.
+      operationId: calculateQuote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "200":
+          description: Itemized price for the requested shipment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "422":
+          $ref: "#/components/responses/BusinessError"
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Simulate payment and persist an approved parcel booking.
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequest"
+      responses:
+        "201":
+          description: Payment approved and booking persisted.
+          headers:
+            Location:
+              description: Relative API path for the newly confirmed booking.
+              schema:
+                type: string
+                example: /api/bookings/4bf64412-0ad4-4884-820c-d3d5d4d856e0
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "402":
+          description: The simulated payment was declined; no booking was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          $ref: "#/components/responses/BusinessError"
+  /bookings/{bookingId}:
+    get:
+      tags: [Bookings]
+      summary: Retrieve an independently persisted confirmed booking.
+      operationId: getBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          description: UUID returned by POST /bookings.
+          schema:
+            type: string
+          example: 4bf64412-0ad4-4884-820c-d3d5d4d856e0
+      responses:
+        "200":
+          description: Persisted parcel booking.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingDetails"
+        "404":
+          description: No persisted booking exists for this identifier.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  schemas:
+    Tier:
+      type: object
+      required: [code, name, deliveryEstimate, baseFee, ratePerKg, ratePerKm]
+      properties:
+        code:
+          type: string
+          description: Registry key accepted by the quote and booking endpoints.
+          example: STANDARD
+        name:
+          type: string
+          example: Standard
+        deliveryEstimate:
+          type: string
+          example: 3-5 business days
+        baseFee:
+          type: number
+          minimum: 0
+          example: 5.00
+        ratePerKg:
+          type: number
+          minimum: 0
+          example: 1.20
+        ratePerKm:
+          type: number
+          minimum: 0
+          example: 0.05
+        maximumDistanceKm:
+          type: [integer, "null"]
+          minimum: 1
+          example: 100
+    QuoteRequest:
+      type: object
+      required: [weightKg, distanceKm, tier]
+      properties:
+        weightKg:
+          type: number
+          minimum: 0.1
+          maximum: 50
+          example: 2.5
+        distanceKm:
+          type: integer
+          minimum: 1
+          maximum: 2500
+          example: 100
+        tier:
+          type: string
+          minLength: 1
+          example: STANDARD
+          description: A code returned from GET /tiers.
+    BookingRequest:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/QuoteRequest"
+        - type: object
+          required: [paymentMethod]
+          properties:
+            paymentMethod:
+              type: string
+              enum: [CREDIT_CARD, CORPORATE_ACCOUNT_BILLING]
+            simulatePaymentFailure:
+              type: boolean
+              default: false
+              description: Test-only simulated decline; never creates a booking.
+      unevaluatedProperties: false
+    Quote:
+      type: object
+      required: [tier, deliveryEstimate, baseFee, weightCharge, distanceCharge, total]
+      properties:
+        tier:
+          type: string
+        deliveryEstimate:
+          type: string
+        baseFee:
+          type: number
+          minimum: 0
+        weightCharge:
+          type: number
+          minimum: 0
+        distanceCharge:
+          type: number
+          minimum: 0
+        total:
+          type: number
+          minimum: 0
+    Booking:
+      type: object
+      required: [bookingId, status, tier, deliveryEstimate, total, paymentMethod, paymentReference]
+      properties:
+        bookingId:
+          type: string
+        status:
+          type: string
+          const: CONFIRMED
+        tier:
+          type: string
+        deliveryEstimate:
+          type: string
+        total:
+          type: number
+          minimum: 0
+        paymentMethod:
+          type: string
+          enum: [CREDIT_CARD, CORPORATE_ACCOUNT_BILLING]
+        paymentReference:
+          type: string
+    BookingDetails:
+      allOf:
+        - $ref: "#/components/schemas/Booking"
+        - type: object
+          required: [weightKg, distanceKm]
+          properties:
+            weightKg:
+              type: number
+            distanceKm:
+              type: integer
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: SAME_DAY_DISTANCE_EXCEEDED
+        message:
+          type: string
+          example: Same-Day delivery is available only for distances up to 100 km.
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationIssue"
+    ValidationIssue:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          example: weightKg
+        message:
+          type: string
+          example: Weight must not exceed 50.0 kg
+  responses:
+    ValidationError:
+      description: One or more parcel fields failed request validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    BusinessError:
+      description: Shipping tier, tier distance limit, or payment method is unsupported.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"

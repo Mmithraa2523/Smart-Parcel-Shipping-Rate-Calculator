@@ -1,0 +1,29 @@
+# Dependencies
+**/node_modules/
+
+# Build outputs and test artifacts
+**/target/
+**/dist/
+**/.angular/
+**/coverage/
+*.log
+
+# Local environment and secret files
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+!**/.env.example
+!**/.env.*.example
+**/secrets/
+**/credentials/
+*.secret
+*.credentials
+credentials.*
+secrets.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
